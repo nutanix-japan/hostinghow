@@ -1,0 +1,144 @@
+version: "3.3"
+
+networks:
+  net:
+    driver: bridge
+
+services:
+
+  traefik:
+    image: "traefik:v2.6"
+    container_name: "traefik"
+    command:
+      #- "--log.level=DEBUG"
+      - "--api.insecure=true"
+      - "--providers.docker=true"
+      - "--providers.docker.exposedbydefault=false"
+      - "--entrypoints.websecure.address=:443"
+      - "--certificatesresolvers.myresolver.acme.tlschallenge=true"
+      #- "--certificatesresolvers.myresolver.acme.caserver=https://acme-staging-v02.api.letsencrypt.org/directory"
+      - "--certificatesresolvers.myresolver.acme.email=ariesbabu@gmail.com"
+      - "--certificatesresolvers.myresolver.acme.storage=/letsencrypt/acme.json"
+    ports:
+      - "443:443"
+      - "8080:8080"
+    volumes:
+      - "./letsencrypt:/letsencrypt"
+      - "/var/run/docker.sock:/var/run/docker.sock:ro"
+
+  how:
+    image: python:alpine
+    container_name: how
+    labels:
+      - "traefik.enable=true"
+      - "traefik.http.routers.how.rule=Host(`handsonworkshop.ddns.net`)"
+      - "traefik.http.routers.how.entrypoints=websecure"
+      - "traefik.http.routers.how.tls.certresolver=letsencrypt"
+    ports:
+      - "8000:8000"
+    build: .
+    command: pip install --no-cache-dir sphinx sphinx-autobuild sphinxcontrib-fulltoc==1.2.0 sphinx-bootstrap-theme==0.6.0 sphinx_fontawesome
+    volumes:
+      - /home/ubuntu/how/docker-entrypoint.py :/usr/local/bin/
+ 
+ ---
+
+ ---
+version: '3.3'
+
+services:
+  traefik:
+    image: traefik:2.6
+    container_name: traefik
+    restart: unless-stopped
+    volumes:
+      - ./traefik/acme.json:/acme.json
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.api.rule=Host(`traefikself.ddns.net`)'
+      - 'traefik.http.routers.api.entrypoints=https'
+      - 'traefik.http.routers.api.service=api@internal'
+      - 'traefik.http.routers.api.tls=true'
+      - 'traefik.http.routers.api.tls.certresolver=letsencrypt'
+    ports:
+      - 80:80
+      - 443:443
+    command:
+      - '--api'
+      - '--providers.docker=true'
+      - '--providers.docker.exposedByDefault=false'
+      - '--entrypoints.http=true'
+      - '--entrypoints.http.address=:80'
+      - '--entrypoints.http.http.redirections.entrypoint.to=https'
+      - '--entrypoints.http.http.redirections.entrypoint.scheme=https'
+      - '--entrypoints.https=true'
+      - '--entrypoints.https.address=:443'
+      - '--certificatesResolvers.letsencrypt.acme.email=ariesbabu@gmail.com'
+      - '--certificatesResolvers.letsencrypt.acme.storage=acme.json'
+      - '--certificatesResolvers.letsencrypt.acme.httpChallenge.entryPoint=http'
+      - '--log=true'
+      - '--log.level=INFO'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+
+  # webapp:
+  #   image: traefik/whoami
+  #   container_name: webapp
+  #   restart: unless-stopped
+  #   labels:
+  #     - 'traefik.enable=true'
+  #     - 'traefik.http.routers.webapp.rule=Host(`appself.ddns.net`)'
+  #     - 'traefik.http.routers.webapp.entrypoints=https'
+  #     - 'traefik.http.routers.webapp.tls=true'
+  #     - 'traefik.http.routers.webapp.tls.certresolver=letsencrypt'
+  #     - 'traefik.http.routers.webapp.service=webappservice'
+  #     - 'traefik.http.services.webappservice.loadbalancer.server.port=80'
+  #   logging:
+  #     driver: "json-file"
+  #     options:
+  #       max-size: "1m"
+
+
+  # portainer:
+  #   image: portainer/portainer-ce:latest
+  #   container_name: portainer
+  #   restart: unless-stopped
+  #   labels:
+  #     - 'traefik.enable=true'
+  #     - 'traefik.http.routers.webapp.rule=Host(`portainerself.ddns.net`)'
+  #     - 'traefik.http.routers.webapp.entrypoints=https'
+  #     - 'traefik.http.routers.webapp.tls=true'
+  #     - 'traefik.http.routers.webapp.tls.certresolver=letsencrypt'
+  #     - 'traefik.http.routers.webapp.service=webappservice'
+  #     - 'traefik.http.services.webappservice.loadbalancer.server.port=9000'
+  #   security_opt:
+  #     - no-new-privileges:true
+  #   volumes:
+  #     - /etc/localtime:/etc/localtime:ro
+  #     - /var/run/docker.sock:/var/run/docker.sock:ro
+  #     - ./portainer-data:/data
+  #   ports:
+  #     - 9000:9000
+
+  how:
+    image: hnakamur/sphinx
+    container_name: how
+    restart: unless-stopped
+    command: bash -c "sphinx-autobuild --host 0.0.0.0 source build/html"
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.webapp1.rule=Host(`howself.ddns.net`)'
+      - 'traefik.http.routers.webapp1.entrypoints=https'
+      - 'traefik.http.routers.webapp1.tls=true'
+      - 'traefik.http.routers.webapp1.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.webapp1.service=webappservice1'
+      - 'traefik.http.services.webappservice1.loadbalancer.server.port=8000'
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /home/ubuntu/za:/documents
+    ports:
+      - 8000:8000
