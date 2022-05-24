@@ -1,0 +1,59 @@
+version: '3.3'
+
+services:
+  traefik:
+    image: traefik:2.6
+    container_name: traefik
+    restart: unless-stopped
+    volumes:
+      - ./traefik/acme.json:/acme.json
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.api.rule=Host(`traefikself.ddns.net`)'
+      - 'traefik.http.routers.api.entrypoints=https'
+      - 'traefik.http.routers.api.service=api@internal'
+      - 'traefik.http.routers.api.tls=true'
+      - 'traefik.http.routers.api.tls.certresolver=letsencrypt'
+    ports:
+      - 80:80
+      - 443:443
+    command:
+      - '--api'
+      - '--providers.docker=true'
+      - '--providers.docker.exposedByDefault=false'
+      - '--entrypoints.http=true'
+      - '--entrypoints.http.address=:80'
+      - '--entrypoints.http.http.redirections.entrypoint.to=https'
+      - '--entrypoints.http.http.redirections.entrypoint.scheme=https'
+      - '--entrypoints.https=true'
+      - '--entrypoints.https.address=:443'
+      - '--certificatesResolvers.letsencrypt.acme.email=ariesbabu@gmail.com'
+      - '--certificatesResolvers.letsencrypt.acme.storage=acme.json'
+      - '--certificatesResolvers.letsencrypt.acme.httpChallenge.entryPoint=http'
+      - '--log=true'
+      - '--log.level=INFO'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+
+  how:
+    image: ariesbabu/sphinx-how
+    container_name: how
+    restart: unless-stopped
+    command: live
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.webapp1.rule=Host(`howself.ddns.net`)'
+      - 'traefik.http.routers.webapp1.entrypoints=https'
+      - 'traefik.http.routers.webapp1.tls=true'
+      - 'traefik.http.routers.webapp1.tls.certresolver=letsencrypt'
+      - 'traefik.http.routers.webapp1.service=webappservice1'
+      - 'traefik.http.services.webappservice1.loadbalancer.server.port=8000'
+    security_opt:
+      - no-new-privileges:true
+    volumes:
+      - /home/ubuntu/za/source:/wd
+    ports:
+      - 8000:8000

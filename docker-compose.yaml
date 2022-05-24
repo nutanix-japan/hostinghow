@@ -123,11 +123,31 @@ services:
   #   ports:
   #     - 9000:9000
 
+  # how:
+  #   image: hnakamur/sphinx
+  #   container_name: how
+  #   restart: unless-stopped
+  #   command: bash -c "sphinx-autobuild --host 0.0.0.0 source build/html"
+  #   labels:
+  #     - 'traefik.enable=true'
+  #     - 'traefik.http.routers.webapp1.rule=Host(`howself.ddns.net`)'
+  #     - 'traefik.http.routers.webapp1.entrypoints=https'
+  #     - 'traefik.http.routers.webapp1.tls=true'
+  #     - 'traefik.http.routers.webapp1.tls.certresolver=letsencrypt'
+  #     - 'traefik.http.routers.webapp1.service=webappservice1'
+  #     - 'traefik.http.services.webappservice1.loadbalancer.server.port=8000'
+  #   security_opt:
+  #     - no-new-privileges:true
+  #   volumes:
+  #     - /home/ubuntu/za:/documents
+  #   ports:
+  #     - 8000:8000
+
   how:
-    image: hnakamur/sphinx
+    image: shuguet/how
     container_name: how
     restart: unless-stopped
-    command: bash -c "sphinx-autobuild --host 0.0.0.0 source build/html"
+    command: live
     labels:
       - 'traefik.enable=true'
       - 'traefik.http.routers.webapp1.rule=Host(`howself.ddns.net`)'
@@ -139,6 +159,6 @@ services:
     security_opt:
       - no-new-privileges:true
     volumes:
-      - /home/ubuntu/za:/documents
+      - /home/ubuntu/za/source:/documents
     ports:
       - 8000:8000
