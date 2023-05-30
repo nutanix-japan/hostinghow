@@ -1,0 +1,87 @@
+version: '3.3'
+
+services:  
+
+  authelia:
+    image: authelia/authelia:4.36.1
+    container_name: authelia
+    volumes:
+      - ./authelia:/config
+    logging:
+      options:
+        max-size: "10m"
+        max-file: "3"
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.authelia.rule=Host(`authelia.apj-cxrules.win`)'
+      - 'traefik.http.routers.authelia.entrypoints=https'
+      - 'traefik.http.routers.authelia.tls=true'
+      - 'traefik.http.routers.authelia.tls.certresolver=cloudflare'
+      - 'traefik.http.middlewares.authelia.forwardauth.address=http://authelia:9091/api/verify?rd=https://authelia.apj-cxrules.win'  # yamllint disable-line rule:line-length
+      - 'traefik.http.middlewares.authelia.forwardauth.trustForwardHeader=true'
+      - 'traefik.http.middlewares.authelia.forwardauth.authResponseHeaders=Remote-User,Remote-Groups,Remote-Name,Remote-Email'  # yamllint disable-line rule:line-length
+    expose:
+      - 9091
+    restart: unless-stopped
+    healthcheck:
+      disable: true
+    environment:
+      - TZ=Australia/Melbourne
+
+
+  traefik:
+    image: traefik:2.6
+    container_name: traefik
+    restart: unless-stopped
+    volumes:
+      - ./traefik/acme.json:/acme.json
+      - /var/run/docker.sock:/var/run/docker.sock
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.api.rule=Host(`traefik.apj-cxrules.win`)'
+      - 'traefik.http.routers.api.entrypoints=https'
+      - 'traefik.http.routers.api.service=api@internal'
+      - 'traefik.http.routers.api.tls=true'
+      - 'traefik.http.routers.api.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.api.middlewares=authelia@docker'
+    ports:
+      - 80:80
+      - 443:443
+    command:
+      - '--api'
+      - '--providers.docker=true'
+      - '--providers.docker.exposedByDefault=false'
+      - '--entrypoints.http=true'
+      - '--entrypoints.http.address=:80'
+      - '--entrypoints.http.http.redirections.entrypoint.to=https'
+      - '--entrypoints.http.http.redirections.entrypoint.scheme=https'
+      - '--entrypoints.https=true'
+      - '--entrypoints.https.address=:443'
+      - '--certificatesResolvers.cloudflare.acme.email=ariesbabu@gmail.com'
+      - '--certificatesResolvers.cloudflare.acme.storage=acme.json'
+      - '--certificatesResolvers.cloudflare.acme.httpChallenge.entryPoint=http'
+      - '--log=true'
+      - '--log.level=INFO'
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "1m"
+
+  # Lookup container starts here 
+  lookup:
+    image: ariesbabu/gsolookup23
+    container_name: gsolookup23
+    restart: unless-stopped
+    labels:
+      - 'traefik.enable=true'
+      - 'traefik.http.routers.webapp1.rule=Host(`lookup.apj-cxrules.win`)'
+      - 'traefik.http.routers.webapp1.entrypoints=https'
+      - 'traefik.http.routers.webapp1.tls=true'
+      - 'traefik.http.routers.webapp1.tls.certresolver=cloudflare'
+      - 'traefik.http.routers.webapp1.service=webappservice1'
+      - 'traefik.http.services.webappservice1.loadbalancer.server.port=5000'
+      - 'traefik.http.routers.webapp1.middlewares=authelia@docker'
+    security_opt:
+      - no-new-privileges:true
+    ports:
+      - 5000:5000
